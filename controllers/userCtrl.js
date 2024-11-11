@@ -42,7 +42,7 @@ const loginController = async (req, res) => {
     if (!isMatch) {
       return res
         .status(200)
-        .send({ message: "Invlid EMail or Password", success: false });
+        .send({ message: "Invalid Email or Password", success: false });
     }
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "1d",
@@ -151,7 +151,7 @@ const getAllNotificationController = async (req, res) => {
     const updatedUser = await user.save();
     res.status(200).send({
       success: true,
-      message: "all notification marked as read",
+      message: "all notifications marked as read",
       data: updatedUser,
     });
   } catch (error) {
@@ -193,7 +193,7 @@ const getAllDocotrsController = async (req, res) => {
     const doctors = await doctorModel.find({ status: "approved" });
     res.status(200).send({
       success: true,
-      message: "Docots Lists Fetched Successfully",
+      message: "Interviewers Lists Fetched Successfully",
       data: doctors,
     });
   } catch (error) {
@@ -201,7 +201,7 @@ const getAllDocotrsController = async (req, res) => {
     res.status(500).send({
       success: false,
       error,
-      message: "Errro WHile Fetching DOcotr",
+      message: "Errro While Fetching Interviewer",
     });
   }
 };
@@ -221,13 +221,13 @@ const bookeAppointmnetController = async (req, res) => {
     const user = await userModel.findOne({ _id: req.body.doctorInfo.userId });
     user.notifcation.push({
       type: "New-appointment-request",
-      message: `A new Appointment Request from ${req.body.userInfo.name}`,
+      message: `A new interview request from ${req.body.userInfo.name}`,
       onCLickPath: "/user/interviews",
     });
     await user.save();
     res.status(200).send({
       success: true,
-      message: "Appointment Booked succesfully",
+      message: "Appointment Booked Succesfully",
     });
   } catch (error) {
     console.log(error);
@@ -300,7 +300,7 @@ const userAppointmentsController = async (req, res) => {
 
     res.status(200).send({
       success: true,
-      message: "Users Appointments Fetch SUccessfully",
+      message: "Users Appointments Fetch Successfully",
       data: appointments,
     });
   } catch (error) {
