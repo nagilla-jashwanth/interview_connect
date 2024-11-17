@@ -12,8 +12,7 @@ const {
   userAppointmentsController,
   updateProfileController,
   userprofileController,
-  sendotpcontroller,
-  verifyotpcontroller
+  verifyEmailController
 } = require("../controllers/userCtrl");
 const authMiddleware = require("../middlewares/authMiddleware");
 
@@ -31,7 +30,7 @@ router.post("/register", registerController);
 router.post("/getUserData", authMiddleware, authController);
 
 //APply Doctor || POST
-router.post("/apply-interviewer", authMiddleware, applyDoctorController);
+// router.post("/apply-interviewer", authMiddleware, applyDoctorController);
 
 router.post("/updateProfile", authMiddleware, updateProfileController);
 
@@ -64,7 +63,14 @@ router.post("/getuserprofileById",authMiddleware,userprofileController)
 //Appointments List
 router.get("/user-interviews", authMiddleware, userAppointmentsController);
 
-router.post("/send-otp",sendotpcontroller)
-router.post("/verify-otp",verifyotpcontroller)
+
+// Email Verification Route
+router.get('/verify-email/:token', verifyEmailController);
+const multer = require('multer');
+const storage = multer.memoryStorage(); // Using memory storage
+const upload = multer({ dest: 'uploads/' });
+
+router.post("/apply-interviewer", upload.single('proof'),authMiddleware, applyDoctorController);
 
 module.exports = router;
+  

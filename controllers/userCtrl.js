@@ -4,55 +4,184 @@ const jwt = require("jsonwebtoken");
 const doctorModel = require("../models/doctorModel");
 const appointmentModel = require("../models/appointmentModel");
 const moment = require("moment");
-//register callback
+
+const nodemailer = require("nodemailer");
+
+// Register Controller
 const registerController = async (req, res) => {
   try {
-    const exisitingUser = await userModel.findOne({ email: req.body.email });
-    if (exisitingUser) {
-      return res
-        .status(200)
-        .send({ message: "User Already Exist", success: false });
+    const existingUser = await userModel.findOne({ email: req.body.email });
+    if (existingUser) {
+      return res.status(200).send({ message: "User Already Exists", success: false });
     }
+
+    // Hash the password
     const password = req.body.password;
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     req.body.password = hashedPassword;
+
+    // Create a new user
     const newUser = new userModel(req.body);
     await newUser.save();
-    res.status(201).send({ message: "Register Sucessfully", success: true });
+
+    // Generate a verification token
+    const verificationToken = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
+
+    // Set up Nodemailer
+    const transporter = nodemailer.createTransport({
+      service: "gmail", // or another email service
+      auth: {
+        user: "ciripuramvarshith@gmail.com",
+        pass: "wmyokiybrjyzerwi",
+        tls: {
+          rejectUnauthorized: false,
+        },
+      },
+      
+    });
+
+    // Send verification email
+    const verificationLink = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;    
+
+    console.log(verificationLink)
+    const mailOptions = {
+      from: "ciripuramvarshith@gmail.com",
+      to: newUser.email,
+      subject: "Verify Your Email",
+      text: `Dear user,
+    
+    Thank you for registering with us! To complete your registration and activate your account, please verify your email address by clicking the link below:
+    
+    ${verificationLink}
+    
+    If you did not create an account, no further action is required.
+    
+    Best regards,
+    InterviewConnect Team`,
+      html: `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Email Verification</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+          }
+          .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 30px auto;
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 20px;
+          }
+          .header h1 {
+            font-size: 24px;
+            color: #1a73e8;
+            margin: 0;
+          }
+          .content {
+            margin-bottom: 20px;
+            font-size: 16px;
+            line-height: 1.5;
+          }
+          .button {
+            display: inline-block;
+            background-color: #1a73e8;
+            color: white;
+            text-decoration: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 20px;
+          }
+          .button:hover {
+            background-color: #0f59a8;
+          }
+          .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            margin-top: 30px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Welcome to InterviewConnect</h1>
+          </div>
+          <div class="content">
+            <p>Dear User,</p>
+            <p>Thank you for registering with us! To complete your registration and activate your account, please verify your email address by clicking the button below:</p>
+          </div>
+          <a href="${verificationLink}" class="button">Verify Your Email</a>
+          <div class="footer">
+            <p>If you did not create an account, no further action is required.</p>
+            <p>Best regards, <br>InterviewConnect Team</p>
+          </div>
+        </div>
+      </body>
+      </html>
+      `,
+    };
+    
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.log("Error sending email:", error);
+      } else {
+        console.log("Verification email sent:", info.response);
+      }
+    });
+
+    res.status(201).send({ message: "Registered successfull! Check your email for verification.", success: true });
   } catch (error) {
     console.log(error);
-    res.status(500).send({
-      success: false,
-      message: `Register Controller ${error.message}`,
-    });
+    res.status(500).send({ success: false, message: `Register Controller Error: ${error.message}` });
   }
 };
 
-// login callback
+
+
 const loginController = async (req, res) => {
   try {
     const user = await userModel.findOne({ email: req.body.email });
     if (!user) {
-      return res
-        .status(200)
-        .send({ message: "user not found", success: false });
+      return res.status(200).send({ message: "User not found", success: false });
     }
+
+    if (!user.isVerified) {
+      return res.status(200).send({ message: "Email not verified. Please check your email.", success: false });
+    }
+    
     const isMatch = await bcrypt.compare(req.body.password, user.password);
     if (!isMatch) {
-      return res
-        .status(200)
-        .send({ message: "Invalid Email or Password", success: false });
+      return res.status(200).send({ message: "Invalid Email or Password", success: false });
     }
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
-    });
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
     res.status(200).send({ message: "Login Success", success: true, token });
   } catch (error) {
     console.log(error);
     res.status(500).send({ message: `Error in Login CTRL ${error.message}` });
   }
 };
+
 
 const authController = async (req, res) => {
   try {
@@ -80,9 +209,74 @@ const authController = async (req, res) => {
 };
 
 // APpply DOctor CTRL
+// const applyDoctorController = async (req, res) => {
+//   try {
+//     const newDoctor = await doctorModel({ ...req.body, status: "pending" });
+//     await newDoctor.save();
+//     const adminUser = await userModel.findOne({ isAdmin: true });
+//     const notifcation = adminUser.notifcation;
+//     notifcation.push({
+//       type: "apply-doctor-request",
+//       message: `${newDoctor.firstName} ${newDoctor.lastName} Has Applied For A Interviewer Account`,
+//       data: {
+//         doctorId: newDoctor._id,
+//         name: newDoctor.firstName + " " + newDoctor.lastName,
+//         onClickPath: "/admin/docotrs",
+//       },
+//     });
+//     await userModel.findByIdAndUpdate(adminUser._id, { notifcation });
+//     res.status(201).send({
+//       success: true,
+//       message: "Doctor Account Applied Successfully",
+//     });
+//   } catch (error) {
+//     console.log(error);
+//     res.status(500).send({
+//       success: false,
+//       error,
+//       message: "Error While Applying As Interviewer",
+//     });
+//   }
+// };
+
+const multer=require('multer')
+const storage = multer.memoryStorage();
+
+
+const fs = require('fs');
+// APpply DOctor CTRL
 const applyDoctorController = async (req, res) => {
   try {
-    const newDoctor = await doctorModel({ ...req.body, status: "pending" });
+
+    console.log(req)
+    const filePath = req.file.path;
+  const fileBuffer = fs.readFileSync(filePath); // Read the file as a buffer
+  const base64File = fileBuffer.toString('base64');
+//   const fileBuffer = req.file.buffer; // Read the file buffer directly
+// const base64File = fileBuffer.toString('base64');
+    const { firstName, lastName, phone, email, address, company, role, experience, feesPerCunsaltation, timings } = req.body;
+
+    // Check if a file was uploaded
+    console.log(req.proof)
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "Proof of certification is required." });
+    }
+
+    const newDoctor = new doctorModel({
+      firstName,
+      lastName,
+      phone,
+      email,
+      address,
+      company,
+      role,
+      experience,
+      feesPerCunsaltation,
+      timings,
+      proof: base64File,  // Save file as buffer in the proof field
+      status: "pending",
+    });
+
     await newDoctor.save();
     const adminUser = await userModel.findOne({ isAdmin: true });
     const notifcation = adminUser.notifcation;
@@ -92,13 +286,13 @@ const applyDoctorController = async (req, res) => {
       data: {
         doctorId: newDoctor._id,
         name: newDoctor.firstName + " " + newDoctor.lastName,
-        onClickPath: "/admin/docotrs",
+        onClickPath: "/admin/interviewers",
       },
     });
     await userModel.findByIdAndUpdate(adminUser._id, { notifcation });
     res.status(201).send({
       success: true,
-      message: "Doctor Account Applied Successfully",
+      message: "Applied As Interviewer Successfully",
     });
   } catch (error) {
     console.log(error);
@@ -109,6 +303,8 @@ const applyDoctorController = async (req, res) => {
     });
   }
 };
+
+
 const userprofileController=async (req,res) => {
   try{
 
@@ -332,72 +528,34 @@ const updateProfileController = async (req, res) => {
     });
   }
 };
-const nodemailer = require("nodemailer");
-const crypto = require("crypto");
-const otpStore = {};
 
-const sendotpcontroller=async(req,res)=>{
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ success: false, message: "Email is required" });
-
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: "ciripuramvarshith@gmail.com",
-      pass: "wmyokiybrjyzerwi",
-    },
-    tls: {
-      rejectUnauthorized: false,
-    },
-  });
-
-  const otp = crypto.randomInt(100000, 999999).toString();
-  const expiry = Date.now() + 5 * 60 * 1000;
-  otpStore[email] = { otp, expiry };
-  console.log(otpStore[email])
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: "Your OTP Code",
-    text: `Your OTP code is ${otp}. It expires in 5 minutes.`,
-  };
-
+// userController.js
+const verifyEmailController = async (req, res) => {
+  console.log("Entered verifyEmailController"); // Check if the controller is reached
   try {
-    await transporter.sendMail(mailOptions);
-    res.status(200).json({ success: true, message: "Otp sent successfully" });
-  } catch (error) {
-    console.error("Error sending email:", error);
-    res.status(500).json({ success: false, message: "Failed to send OTP" });
-  }
-}
+    const token = req.params.token;
+    // console.log("Received token:", token); // Debugging token output
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // console.log("Decoded token:", decoded); // Debugging decoded output
 
-
-const verifyotpcontroller=async(req,res)=>{
-
-  const { email, typedotp } = req.body;
-
-  const otpToken = otpStore[email][0];
-  if (!otpToken) {
-    return res.status(400).json({ success: false, message: 'OTP not found or expired' });
-  }
-
-
-
-
-  try {
-    // Verify OTP token
-    
-    if (otpToken === typedotp) {
-      delete otpStore[email]; // Remove OTP after successful verification
-      res.status(200).json({ success: true, message: 'OTP verified successfully' });
-    } else {
-      res.status(400).json({ success: false, message: 'Invalid OTP' });
+    const user = await userModel.findById(decoded.id);
+    if (!user) {
+      return res.status(400).send({ message: "Invalid link", success: false });
     }
+
+    if (user.isVerified) {
+      return res.status(200).send({ message: "Email already verified", success: true });
+    }
+
+    user.isVerified = true;
+    await user.save();
+
+    res.status(200).send({ message: "Email verified successfully", success: true });
   } catch (error) {
-    res.status(400).json({ success: false, message: 'OTP expired or invalid' });
+    console.log("Verification error:", error.message); // Error log
+    res.status(500).send({ success: false, message: `Error in Email Verification: ${error.message}` });
   }
-}
+};
 
 
 
@@ -416,6 +574,6 @@ module.exports = {
   userAppointmentsController,
   updateProfileController,
   userprofileController,
-  verifyotpcontroller,
-  sendotpcontroller
+  verifyEmailController,
+  
 };

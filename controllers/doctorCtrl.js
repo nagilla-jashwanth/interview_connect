@@ -70,7 +70,7 @@ const doctorAppointmentsController = async (req, res) => {
     });
     res.status(200).send({
       success: true,
-      message: "Doctor Appointments fetch Successfully",
+      message: " Interviews fetch Successfully",
       data: appointments,
     });
   } catch (error) {
@@ -78,7 +78,7 @@ const doctorAppointmentsController = async (req, res) => {
     res.status(500).send({
       success: false,
       error,
-      message: "Error in Doc Appointments",
+      message: "Error in fetching intervies",
     });
   }
 };
